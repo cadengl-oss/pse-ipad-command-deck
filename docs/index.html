@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080a0f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PSE Command">
+  <meta name="description" content="PSE Command Deck for iPad">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon-180.png">
+  <link rel="stylesheet" href="./styles.css">
+  <title>PSE Command Deck</title>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><div class="mark">PSE</div><div><small>PILOT SALES ENTERPRISE</small><h1>PSE Command Deck</h1></div></div>
+      <div class="live" id="networkBadge"><span></span><b id="networkText">Checking link</b></div>
+    </header>
+    <nav class="nav" aria-label="Command Deck sections">
+      <a href="#command">Command</a><a href="#systems">Systems</a><a href="#apps">Apps</a><a href="#help">Help</a>
+      <button id="installButton">Install</button>
+    </nav>
+    <section class="hero" id="command">
+      <div><small>NO OPENAI API REQUIRED</small><h2>Send a mission to ChatGPT</h2><p>Build the mission here, copy it, then open ChatGPT. Your ChatGPT account stays in control of the final send.</p></div>
+      <div class="status">REMOTE SHELL<br><strong>ONLINE</strong></div>
+    </section>
+    <section class="composer-card">
+      <textarea id="missionInput" rows="5" maxlength="12000" placeholder="What do you want PSE + ChatGPT to do?"></textarea>
+      <div class="actions"><button id="copyButton">Copy mission</button><button class="primary" id="openButton">Open ChatGPT ↗</button></div>
+      <p class="hint" id="handoffHint">ChatGPT handoff uses your normal ChatGPT app/account. No API key is stored here.</p>
+    </section>    <section class="section" id="systems">
+      <div class="section-head"><div><small>QUICK ACTIONS</small><h2>System shortcuts</h2></div></div>
+      <div class="grid">
+        <button class="mission" data-preset="mac"><b>Mac</b><span>Status shortcut</span></button>
+        <button class="mission" data-preset="omarchy"><b>Omarchy</b><span>Status shortcut</span></button>
+        <button class="mission" data-preset="vps"><b>VPS</b><span>Status shortcut</span></button>
+        <button class="mission" data-preset="sns"><b>SNS Go</b><span>Workflow shortcut</span></button>
+      </div>
+    </section>
+    <section class="section" id="apps">
+      <div class="section-head"><div><small>PSE APPS</small><h2>Project shortcuts</h2></div></div>
+      <div class="grid">
+        <button class="mission" data-preset="sales"><b>Website Sales OS</b><span>Lead pipeline</span></button>
+        <button class="mission" data-preset="control"><b>Mission Control</b><span>Control plane</span></button>
+        <button class="mission" data-preset="ai"><b>AI Pool</b><span>AI services</span></button>
+        <button class="mission" data-preset="jobs"><b>Jobs</b><span>Job pipeline</span></button>
+      </div>
+    </section>    <footer><span>PSE Command Deck</span><span id="clock">—</span></footer>
+  </main>
+  <div class="toast" id="toast" hidden></div>
+  <script src="./app.js"></script>
+</body>
+</html>

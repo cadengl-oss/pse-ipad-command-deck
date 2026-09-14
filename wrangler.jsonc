@@ -1,0 +1,9 @@
+{
+  "$schema": "../pse-mission-control-chatgpt-gateway/node_modules/wrangler/config-schema.json",
+  "name": "pse-ipad-command-deck",
+  "compatibility_date": "2026-09-14",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./docs"
+  }
+}
