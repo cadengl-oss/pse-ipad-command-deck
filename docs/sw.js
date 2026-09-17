@@ -1,4 +1,4 @@
-const CACHE = "pse-command-deck-v1";
+const CACHE = "pse-command-deck-v2";
 const ASSETS = ["./","./styles.css","./app.js","./manifest.webmanifest","./icon-180.png","./icon-512.png"];
 self.addEventListener("install", (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS))));
 self.addEventListener("activate", (event) => event.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))));
