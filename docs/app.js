@@ -119,6 +119,18 @@
     $("libraryState").textContent = "Connecting…";
     $("libraryState").dataset.state = "loading";
     $("gridState").textContent = "CHECKING";
+    if (location.hostname === "cadengl-oss.github.io") {
+      libraryPayload = null;
+      libraryProducts = [];
+      $("libraryOpen").href = PRIVATE_DECK;
+      $("libraryOpen").textContent = "Open Private Deck ↗";
+      $("libraryState").textContent = "Private Deck required";
+      $("libraryState").dataset.state = "offline";
+      $("gridState").textContent = "PRIVATE";
+      $("libraryMeta").textContent = "This public bootstrap does not request private Grid data. Open the Private Deck on the PSE tailnet for live products and health.";
+      renderLibrary();
+      return;
+    }
     try {
       const response = await fetch(SURFACE_API, {
         cache: "no-store",
