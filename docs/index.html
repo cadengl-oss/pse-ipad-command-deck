@@ -17,21 +17,22 @@
   <main class="shell">
     <header class="topbar">
       <div class="brand"><div class="mark">PSE</div><div><small>PILOT SALES ENTERPRISE</small><h1>PSE Command Deck</h1></div></div>
-      <div class="live" id="networkBadge"><span></span><b id="networkText">Checking link</b></div>
+      <div class="live" id="networkBadge"><span></span><b id="networkText">Checking network</b></div>
     </header>
     <nav class="nav" aria-label="Command Deck sections">
-      <a href="#command">Command</a><a href="#systems">Systems</a><a href="#apps">Apps</a><a href="#help">Help</a>
+      <a href="#command">Command</a><a href="#systems">Systems</a><a href="#library">Library</a><a href="#apps">Missions</a>
       <button id="installButton">Install</button>
     </nav>
     <section class="hero" id="command">
       <div><small>NO OPENAI API REQUIRED</small><h2>Send a mission to ChatGPT</h2><p>Build the mission here, copy it, then open ChatGPT. Your ChatGPT account stays in control of the final send.</p></div>
-      <div class="status">REMOTE SHELL<br><strong>ONLINE</strong></div>
+      <div class="status">PSE GRID<br><strong id="gridState">CHECKING</strong></div>
     </section>
     <section class="composer-card">
       <textarea id="missionInput" rows="5" maxlength="12000" placeholder="What do you want PSE + ChatGPT to do?"></textarea>
       <div class="actions"><button id="copyButton">Copy mission</button><button class="primary" id="openButton">Open ChatGPT ↗</button></div>
       <p class="hint" id="handoffHint">ChatGPT handoff uses your normal ChatGPT app/account. No API key is stored here.</p>
-    </section>    <section class="section" id="systems">
+    </section>
+    <section class="section" id="systems">
       <div class="section-head"><div><small>QUICK ACTIONS</small><h2>System shortcuts</h2></div></div>
       <div class="grid">
         <button class="mission" data-preset="mac"><b>Mac</b><span>Status shortcut</span></button>
@@ -40,16 +41,28 @@
         <button class="mission" data-preset="sns"><b>SNS Go</b><span>Workflow shortcut</span></button>
       </div>
     </section>
+    <section class="section" id="library">
+      <div class="section-head library-head">
+        <div><small>CANONICAL APP LIBRARY</small><h2>PSE apps</h2></div>
+        <div class="library-state"><b id="libraryState">Connecting…</b><button id="libraryRefresh" type="button">Refresh</button></div>
+      </div>
+      <div class="library-tools">
+        <input id="librarySearch" type="search" inputmode="search" autocomplete="off" placeholder="Search products, aliases, categories…" aria-label="Search canonical PSE apps">
+        <a id="libraryOpen" class="compact-link" href="https://omarchy.tail7ba003.ts.net:10443/" target="_blank" rel="noopener">Open full Library ↗</a>
+      </div>
+      <p class="hint" id="libraryMeta">Private Grid connection required for live product state.</p>
+      <div class="grid library-grid" id="libraryGrid" aria-live="polite"></div>
+    </section>
     <section class="section" id="apps">
-      <div class="section-head"><div><small>PSE APPS</small><h2>Project shortcuts</h2></div></div>
+      <div class="section-head"><div><small>MISSION SHORTCUTS</small><h2>Project context</h2></div></div>
       <div class="grid">
         <button class="mission" data-preset="sales"><b>Website Sales OS</b><span>Lead pipeline</span></button>
         <button class="mission" data-preset="control"><b>Mission Control</b><span>Control plane</span></button>
         <button class="mission" data-preset="ai"><b>AI Pool</b><span>AI services</span></button>
         <button class="mission" data-preset="jobs"><b>Jobs</b><span>Job pipeline</span></button>
-        <a class="mission app-link" href="http://100.82.4.66:9161/control.html"><b>Wall Remote</b><span>Forge · CR320QC</span></a>
       </div>
-    </section>    <footer><span>PSE Command Deck</span><span id="clock">—</span></footer>
+    </section>
+    <footer><span>PSE Command Deck</span><span id="clock">—</span></footer>
   </main>
   <div class="toast" id="toast" hidden></div>
   <script src="./app.js"></script>
