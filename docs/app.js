@@ -5,6 +5,7 @@
   const toast = $("toast");
   const SURFACE_API = "https://omarchy.tail7ba003.ts.net:10443/api/surface";
   const LIBRARY_FALLBACK = "https://omarchy.tail7ba003.ts.net:10443/";
+  const PRIVATE_DECK = "https://omarchy.tail7ba003.ts.net:9443/deck/";
   let deferredInstall = null;
   let libraryProducts = [];
   let libraryPayload = null;
@@ -131,6 +132,7 @@
       libraryPayload = data;
       libraryProducts = data.products;
       $("libraryOpen").href = safeHttpUrl(data.libraryUrl) || LIBRARY_FALLBACK;
+      $("libraryOpen").textContent = "Open full Library ↗";
       const active = libraryProducts.filter((item) => item.lifecycle === "ACTIVE");
       const healthy = active.filter((item) => item.health === "HEALTHY").length;
       const attention = active.filter((item) => ["UNKNOWN", "BLOCKED", "DEGRADED", "OFFLINE"].includes(item.health)).length;
@@ -142,11 +144,15 @@
     } catch {
       libraryPayload = null;
       libraryProducts = [];
-      $("libraryOpen").href = LIBRARY_FALLBACK;
-      $("libraryState").textContent = "Private link unavailable";
+      const publicBootstrap = location.hostname === "cadengl-oss.github.io";
+      $("libraryOpen").href = publicBootstrap ? PRIVATE_DECK : LIBRARY_FALLBACK;
+      $("libraryOpen").textContent = publicBootstrap ? "Open Private Deck ↗" : "Open full Library ↗";
+      $("libraryState").textContent = publicBootstrap ? "Private Deck required" : "Private link unavailable";
       $("libraryState").dataset.state = "offline";
       $("gridState").textContent = "PRIVATE";
-      $("libraryMeta").textContent = "Connect this iPad to the PSE private network, then refresh. Cached Command Deck missions remain available.";
+      $("libraryMeta").textContent = publicBootstrap
+        ? "This public bootstrap cannot read private Grid data in every browser. Open the Private Deck on the PSE tailnet for live products and health."
+        : "Private Grid link unavailable. Verify tailnet connectivity, then refresh. Cached Command Deck missions remain available.";
       renderLibrary();
     }
   }
