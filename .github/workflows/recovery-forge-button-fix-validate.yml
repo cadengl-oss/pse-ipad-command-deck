@@ -1,0 +1,21 @@
+name: recovery-forge-button-fix-validate
+
+on:
+  push:
+    branches:
+      - recovery/forge-button-fix-20260920
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile
+        run: python3 -m py_compile recovery/pse_fix_forge_button.py
+      - name: Self test
+        run: python3 recovery/pse_fix_forge_button.py --self-test
