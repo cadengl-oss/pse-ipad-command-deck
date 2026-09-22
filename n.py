@@ -157,6 +157,15 @@ try:
     else:
         print("LIVE_OAUTH_DESCRIPTOR_PATCH=ALREADY_PRESENT")
 
+    # Exercise the installed RC19 facade/public-edge tests against the patched
+    # source before introducing any new listeners or Caddy routes.
+    run([
+      "node","--test",
+      str(RC/"packages/mcp-facade/test/mcp-facade.test.mjs"),
+      str(RC/"packages/mcp-facade/test/public-edge.test.mjs")
+    ],True,True,180)
+    print("RC19_PUBLIC_TESTS=PASS")
+
     AUTH_ROOT.mkdir(mode=0o700,parents=True,exist_ok=True)
     CFG.mkdir(mode=0o700,parents=True,exist_ok=True)
     SECRETS.mkdir(mode=0o700,parents=True,exist_ok=True)
