@@ -134,12 +134,15 @@ export async function verifyAccessToken(token,config,{fetchImpl=fetch}={}) {
   }
 
   const exact=config.ownerMap.get(data.sub);
+  const username=typeof data.username==="string"&&data.username.trim()
+    ? config.ownerMap.get(`username:${data.username.trim()}`)
+    : null;
   const wildcard=config.ownerMap.get("*");
-  const mapping=exact??wildcard;
+  const mapping=exact??username??wildcard;
   if (!mapping) throw new Error("authenticated profile is not provisioned for PSE Remote Commander");
   const effectiveProfile={
     ...mapping.profile,
-    id:exact?mapping.profile.id:data.sub
+    id:(exact??username)?mapping.profile.id:data.sub
   };
   const scopes=new Set(
     Array.isArray(data.scope)
