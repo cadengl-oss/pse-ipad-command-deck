@@ -220,18 +220,17 @@ export const TOOL_SPEC_BY_NAME=Object.freeze(
 );
 EOF
 
-docker exec "$STAGE" python3 - <<'PY'
-from pathlib import Path
-p=Path("/app/packages/mcp-facade/src/server.mjs")
-s=p.read_text()
-old='import { TOOL_SPECS } from "./tool-specs.mjs";'
-new='import { TOOL_SPECS } from "./tool-specs-v1.mjs";'
-if old not in s:
-    raise SystemExit("server import anchor missing")
-s=s.replace(old,new,1)
-s=s.replace("title:spec.name,","title:spec.title??spec.name,",1)
-p.write_text(s)
-PY
+docker exec -i "$STAGE" node --input-type=module - <<'NODE'
+import fs from "node:fs";
+const path="/app/packages/mcp-facade/src/server.mjs";
+let source=fs.readFileSync(path,"utf8");
+const oldImport='import { TOOL_SPECS } from "./tool-specs.mjs";';
+const newImport='import { TOOL_SPECS } from "./tool-specs-v1.mjs";';
+if(!source.includes(oldImport)) throw new Error("server import anchor missing");
+source=source.replace(oldImport,newImport);
+source=source.replace("title:spec.name,","title:spec.title??spec.name,");
+fs.writeFileSync(path,source);
+NODE
 
 docker exec "$STAGE" sh -ceu 'cd /app && npm ci --omit=optional --ignore-scripts --no-audit --no-fund'
 docker exec "$STAGE" sh -ceu 'cd /app && node --test \
@@ -242,7 +241,7 @@ docker exec "$STAGE" sh -ceu 'cd /app && node --test \
   packages/mcp-facade/test/mcp-facade.test.mjs \
   packages/mcp-facade/test/http-entrypoint.test.mjs'
 
-docker exec "$STAGE" sh -ceu 'cd /app && node --input-type=module - <<'"'"'NODE'"'"'
+docker exec -i "$STAGE" sh -ceu 'cd /app && node --input-type=module -' <<'NODE'
 import {TOOL_SPECS} from "./packages/mcp-facade/src/tool-specs-v1.mjs";
 if(TOOL_SPECS.length!==28) throw new Error("expected 28 tools");
 for(const tool of TOOL_SPECS){
@@ -253,7 +252,7 @@ for(const tool of TOOL_SPECS){
 const start=TOOL_SPECS.find(t=>t.name==="start_search");
 if(start?.annotations?.readOnlyHint!==false) throw new Error("start_search annotation mismatch");
 console.log("STRICT_TOOL_METADATA_BUILD=PASS");
-NODE'
+NODE
 
 docker exec -i "$STAGE" sh -c 'cat > /usr/local/bin/pse-rc-run-relay' <<'EOF'
 #!/bin/sh
@@ -283,7 +282,7 @@ docker stop "$STAGE" >/dev/null
 docker commit \
   --change 'WORKDIR /app' \
   --change 'ENV NODE_ENV=production' \
-  --change 'LABEL org.opencontainers.image.title=PSE Remote Commander V1' \
+  --change 'LABEL org.opencontainers.image.title=PSE-Remote-Commander-V1' \
   --change 'LABEL org.opencontainers.image.version=1.0.0-live-preserved' \
   "$STAGE" "$IMAGE" >/dev/null
 docker rm "$STAGE" >/dev/null
@@ -312,7 +311,7 @@ docker run -d --name "$SMOKE_MCP" \
   "$IMAGE" /usr/local/bin/pse-rc-run-mcp >/dev/null
 wait_http_code http://127.0.0.1:28751/mcp 401
 
-docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+docker run --rm -i --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true \
   --user "$RUNTIME_OWNER" \
   -e TOKEN_FILE="$MCP_TOKEN" \
   -v "$MCP_TOKEN:$MCP_TOKEN:ro" \
