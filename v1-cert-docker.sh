@@ -2,12 +2,26 @@
 set -euo pipefail
 
 CERT_URL="https://raw.githubusercontent.com/cadengl-oss/pse-ipad-command-deck/427ff68bf0f3166c231a6e4ceef2e8ffae3da76c/v1-cert.mjs"
+CERT_BLOB_SHA="fb9871532b020597581f44046ca2d98e13489975"
 APP_ROOT="/opt/pse-remote-commander/current"
 MCP_TOKEN="/etc/pse/remote-commander-mcp-token"
 IMAGE="node:22-bookworm-slim"
 
 command -v docker >/dev/null || { echo "CERT_ERROR=docker unavailable"; exit 1; }
 command -v curl >/dev/null || { echo "CERT_ERROR=curl unavailable"; exit 1; }
+command -v python3 >/dev/null || { echo "CERT_ERROR=python3 unavailable"; exit 1; }
+
+CERT_TMP=$(mktemp /tmp/pse-rc-v1-cert.XXXXXX.mjs)
+trap 'rm -f "$CERT_TMP"' EXIT
+curl -fsSL "$CERT_URL" -o "$CERT_TMP"
+ACTUAL_BLOB_SHA=$(python3 - "$CERT_TMP" <<'PY'
+import hashlib, sys
+data=open(sys.argv[1],"rb").read()
+print(hashlib.sha1(f"blob {len(data)}\0".encode()+data).hexdigest())
+PY
+)
+[ "$ACTUAL_BLOB_SHA" = "$CERT_BLOB_SHA" ] || { echo "CERT_ERROR=certifier integrity mismatch"; exit 1; }
+echo "CERTIFIER_INTEGRITY=PASS"
 
 # Bind-mount sources are resolved on the Docker daemon host. Read only the
 # token file metadata so the certification container can run as the token's
@@ -68,9 +82,9 @@ docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-
   "
 echo "MCP_LOOPBACK_REACHABILITY=PASS"
 
-# Stream the audited certifier over stdin. The token stays a read-only host
-# bind mount and is never copied to Mobile Command or printed.
-curl -fsSL "$CERT_URL" | docker run --rm -i \
+# Feed the already hash-verified certifier over stdin. The token stays a
+# read-only host bind mount and is never copied to Mobile Command or printed.
+docker run --rm -i \
   --network host \
   --read-only \
   --tmpfs /tmp:rw,noexec,nosuid,size=64m \
@@ -84,6 +98,6 @@ curl -fsSL "$CERT_URL" | docker run --rm -i \
   -e PSE_RC_MCP_PORT=18751 \
   -v "$APP_ROOT:$APP_ROOT:ro" \
   -v "$MCP_TOKEN:$MCP_TOKEN:ro" \
-  "$IMAGE" node --input-type=module -
+  "$IMAGE" node --input-type=module - < "$CERT_TMP"
 
 echo "V1_CERT_WRAPPER=PASS"
