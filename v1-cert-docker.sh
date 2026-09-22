@@ -18,8 +18,28 @@ docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true
     test -d /probe/app/node_modules
     test -s /probe/mcp.env
     test -s /probe/mcp-token
+    cat /probe/mcp.env >/dev/null
+    cat /probe/mcp-token >/dev/null
   '
 echo "HOST_SECRET_ACCESS=PASS"
+
+docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true   -v "$APP_ROOT:$APP_ROOT:ro"   "$IMAGE" node --input-type=module -e '
+    import { createRequire } from "node:module";
+    const root=process.env.PSE_RC_APP_ROOT;
+    const requireFromApp=createRequire(root+"/package.json");
+    const resolved=requireFromApp.resolve("@modelcontextprotocol/client");
+    const mod=await import(resolved);
+    if (typeof mod.Client!=="function") throw new Error("MCP Client export missing");
+    if (typeof mod.StreamableHTTPClientTransport!=="function") throw new Error("StreamableHTTPClientTransport export missing");
+  '   --env PSE_RC_APP_ROOT="$APP_ROOT"
+echo "MCP_CLIENT_API=PASS"
+
+docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true   "$IMAGE" node -e "
+    fetch('http://127.0.0.1:18751/mcp')
+      .then(r=>{ if(r.status!==401) throw new Error('expected 401, got '+r.status); })
+      .catch(e=>{ console.error(e.message); process.exit(1); });
+  "
+echo "MCP_LOOPBACK_REACHABILITY=PASS"
 
 # Stream the audited certifier over stdin; the token remains a host-mounted
 # file and is never copied to Mobile Command or stdout.
