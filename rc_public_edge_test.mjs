@@ -165,3 +165,22 @@ test("exact owner mapping overrides wildcard fallback", async ()=>{
   assert.equal(identity.ownerId,"caden");
   assert.equal(identity.profile.id,"prf_caden");
 });
+
+test("username owner mapping overrides wildcard for stable owner login", async ()=>{
+  const config=baseConfig();
+  config.ownerMap.delete("subject-1");
+  config.ownerMap.set("username:pseowner",{ownerId:"caden",profile:{id:"prf_pse_owner",nickname:"PSE owner"}});
+  config.ownerMap.set("*",{ownerId:"openai-review-canary",profile:{id:"prf_review"}});
+  const fakeFetch=async()=>new Response(JSON.stringify({
+    active:true,
+    sub:"opaque-owner-subject",
+    username:"pseowner",
+    iss:config.oauthIssuer,
+    resource:config.publicResource,
+    scope:"pse.read pse.execute"
+  }),{status:200,headers:{"content-type":"application/json"}});
+  const identity=await verifyAccessToken("owner-token",config,{fetchImpl:fakeFetch});
+  assert.equal(identity.ownerId,"caden");
+  assert.equal(identity.profile.id,"prf_pse_owner");
+  assert.equal(identity.scopes.has("pse.execute"),true);
+});
