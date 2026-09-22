@@ -71,8 +71,22 @@ test("OAuth introspection rejects a token for another resource", async ()=>{
   }),{status:200,headers:{"content-type":"application/json"}});
   await assert.rejects(
     verifyAccessToken("wrong-audience",config,{fetchImpl:fakeFetch}),
-    /audience mismatch/
+    /resource mismatch/
   );
+});
+
+test("OAuth introspection accepts RFC8707 resource indicator without aud", async ()=>{
+  const config=baseConfig();
+  const fakeFetch=async()=>new Response(JSON.stringify({
+    active:true,
+    sub:"subject-1",
+    iss:config.oauthIssuer,
+    resource:config.publicResource,
+    scope:"pse.read"
+  }),{status:200,headers:{"content-type":"application/json"}});
+  const identity=await verifyAccessToken("resource-token",config,{fetchImpl:fakeFetch});
+  assert.equal(identity.ownerId,"caden");
+  assert.equal(identity.scopes.has("pse.read"),true);
 });
 
 test("public edge exposes discovery/challenge and rejects unauthenticated MCP", async ()=>{
