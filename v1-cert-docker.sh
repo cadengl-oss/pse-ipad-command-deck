@@ -25,6 +25,8 @@ TOKEN_OWNER=$(docker run --rm --read-only --cap-drop ALL --security-opt no-new-p
 # dependency tree before any MCP call is attempted.
 docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true \
   --user "$TOKEN_OWNER" \
+  -e PSE_RC_APP_ROOT="$APP_ROOT" \
+  -e PSE_RC_MCP_TOKEN_FILE="$MCP_TOKEN" \
   -v "$APP_ROOT:$APP_ROOT:ro" \
   -v "$MCP_TOKEN:$MCP_TOKEN:ro" \
   "$IMAGE" node -e '
@@ -34,9 +36,7 @@ docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true
     fs.accessSync(root+"/node_modules",fs.constants.R_OK);
     const token=fs.readFileSync(process.env.PSE_RC_MCP_TOKEN_FILE,"utf8").trim();
     if(token.length<32) throw new Error("invalid MCP token");
-  ' \
-  --env PSE_RC_APP_ROOT="$APP_ROOT" \
-  --env PSE_RC_MCP_TOKEN_FILE="$MCP_TOKEN"
+  '
 echo "HOST_SECRET_ACCESS=PASS"
 
 # Prove the mounted live release exports the exact MCP v2 client APIs used by
