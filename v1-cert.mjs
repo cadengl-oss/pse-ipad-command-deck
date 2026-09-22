@@ -88,20 +88,72 @@ async function processCanary(client,device){
   const host=(text.match(/PSE_RC_HOST=([^\n\r]+)/)||[])[1]?.trim()??"observed";
   console.log(`PROCESS_${device.toUpperCase()}=PASS host=${host}`);
 }
+function extractAllowedDirectories(value){
+  const found=[];
+  const seen=new Set();
+  const walk=(v)=>{
+    if(v===null||v===undefined) return;
+    if(typeof v==="string"){
+      const t=v.trim();
+      if((t.startsWith("{")||t.startsWith("["))){
+        try { walk(JSON.parse(t)); } catch {}
+      }
+      return;
+    }
+    if(typeof v!=="object"||seen.has(v)) return;
+    seen.add(v);
+    if(!Array.isArray(v)&&Array.isArray(v.allowedDirectories)){
+      for(const p of v.allowedDirectories) if(typeof p==="string"&&p.startsWith("/")) found.push(p);
+    }
+    if(Array.isArray(v)){for(const x of v) walk(x);}
+    else {for(const x of Object.values(v)) walk(x);}
+  };
+  walk(value);
+  return [...new Set(found)];
+}
+
 async function fileCanary(client,device){
-  const path=CANARY_PATH[device];
+  const config=assertToolOk("get_config",device,await client.callTool({
+    name:"get_config",arguments:{deviceId:device}
+  }));
+  const allowed=extractAllowedDirectories(config);
+  const preferred=CANARY_PATH[device];
+  const candidates=[];
+  if(preferred) candidates.push(preferred);
+  for(const dir of allowed){
+    const base=dir.replace(/\/+$/,"");
+    const candidate=`${base}/.pse-rc-v1-certification-${device}.txt`;
+    if(!candidates.includes(candidate)) candidates.push(candidate);
+  }
+  if(!candidates.length) fail(`no allowed-directory candidate available on ${device}`);
+
   const marker=`PSE_RC_V1_${device}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-  assertToolOk("write_file",device,await client.callTool({
-    name:"write_file",arguments:{deviceId:device,path,content:marker+"\n",mode:"rewrite"}
-  }));
-  const read=assertToolOk("read_file",device,await client.callTool({
-    name:"read_file",arguments:{deviceId:device,path,offset:0,length:50}
-  }));
-  if(!allText(read).includes(marker)) fail(`file read-back marker mismatch on ${device}`);
-  const cleanup=await client.callTool({
-    name:"start_process",arguments:{deviceId:device,command:`rm -f -- ${shellQuote(path)}`,timeout_ms:5000}
-  });
-  assertToolOk("cleanup",device,cleanup);
+  let selected=null;
+  let lastError="";
+  for(const path of candidates){
+    const write=await client.callTool({
+      name:"write_file",arguments:{deviceId:device,path,content:marker+"\n",mode:"rewrite"}
+    });
+    if(write?.isError){
+      lastError=allText(write).slice(0,300);
+      continue;
+    }
+    selected=path;
+    break;
+  }
+  if(!selected) fail(`no writable allowed-directory canary path on ${device}: ${lastError}`);
+
+  try{
+    const read=assertToolOk("read_file",device,await client.callTool({
+      name:"read_file",arguments:{deviceId:device,path:selected,offset:0,length:50}
+    }));
+    if(!allText(read).includes(marker)) fail(`file read-back marker mismatch on ${device}`);
+  } finally {
+    const cleanup=await client.callTool({
+      name:"start_process",arguments:{deviceId:device,command:`rm -f -- ${shellQuote(selected)}`,timeout_ms:5000}
+    });
+    assertToolOk("cleanup",device,cleanup);
+  }
   console.log(`FILE_${device.toUpperCase()}=PASS`);
 }
 
