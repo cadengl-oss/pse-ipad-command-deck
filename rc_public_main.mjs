@@ -66,7 +66,6 @@ export function loadPublicMcpConfig(env=process.env) {
   const ownerMap=parseOwnerMap(readOwnerOnly(env.PSE_RC_PUBLIC_OWNER_MAP_FILE??"","public owner map",{min:2,max:65536}));
 
   const challengeFile=env.PSE_RC_OPENAI_APPS_CHALLENGE_FILE||null;
-  const challenge=challengeFile?readOwnerOnly(challengeFile,"OpenAI apps challenge",{min:8,max:2048}):null;
   const documentationUrl=env.PSE_RC_RESOURCE_DOCUMENTATION_URL
     ? httpsUrl(env.PSE_RC_RESOURCE_DOCUMENTATION_URL,"PSE_RC_RESOURCE_DOCUMENTATION_URL").toString()
     : undefined;
@@ -86,7 +85,7 @@ export function loadPublicMcpConfig(env=process.env) {
     relayBaseUrl,
     internalToken,
     ownerMap,
-    challenge,
+    challengeFile,
     documentationUrl
   };
 }
@@ -227,9 +226,15 @@ export function createPublicMcpHttpServer(config=loadPublicMcpConfig(),{fetchImp
         return;
       }
       if (req.method==="GET" && url.pathname==="/.well-known/openai-apps-challenge") {
-        if (!config.challenge) { res.writeHead(404); res.end(); return; }
+        let challenge=typeof config.challenge==="string"?config.challenge:null;
+        if (!challenge && config.challengeFile) {
+          try {
+            challenge=readOwnerOnly(config.challengeFile,"OpenAI apps challenge",{min:8,max:2048});
+          } catch {}
+        }
+        if (!challenge) { res.writeHead(404); res.end(); return; }
         res.writeHead(200,{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"});
-        res.end(config.challenge);
+        res.end(challenge);
         return;
       }
       if (req.method==="GET" && PUBLIC_PAGES[url.pathname]) {
