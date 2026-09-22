@@ -65,6 +65,7 @@ def rollback():
         (BACKUP/"remote-commander-owner-map.json",OWNER_MAP),
         (BACKUP/"remote-commander-oauth-introspection-secret",INT_SECRET),
         (BACKUP/"main.mjs",RC/"apps/mcp-public/main.mjs"),
+        (BACKUP/"server.mjs",RC/"packages/mcp-facade/src/server.mjs"),
     ]:
         if src.exists():
             shutil.copy2(src,dst)
@@ -90,6 +91,8 @@ try:
     main=RC/"apps/mcp-public/main.mjs"
     if not main.exists(): raise RuntimeError("RC19 public MCP implementation missing")
     if not (RC/"apps/relay/main.mjs").exists(): raise RuntimeError("Remote Commander release tree incomplete")
+    facade_server=RC/"packages/mcp-facade/src/server.mjs"
+    if not facade_server.exists(): raise RuntimeError("Remote Commander MCP facade source missing")
     if not CADDY.exists(): raise RuntimeError("active Caddyfile missing")
     run(["caddy","validate","--config",str(CADDY)])
 
@@ -98,7 +101,8 @@ try:
         (CADDY,"Caddyfile"),(AUTH_CADDY,"pse-remote-commander-auth.caddy"),
         (MCP_CADDY,"pse-remote-commander.caddy"),(UNIT,"pse-remote-commander-mcp-public.service"),
         (ENV,"remote-commander-mcp-public.env"),(OWNER_MAP,"remote-commander-owner-map.json"),
-        (INT_SECRET,"remote-commander-oauth-introspection-secret"),(main,"main.mjs")
+        (INT_SECRET,"remote-commander-oauth-introspection-secret"),(main,"main.mjs"),
+        (RC/"packages/mcp-facade/src/server.mjs","server.mjs")
     ]:
         if src.exists(): shutil.copy2(src,BACKUP/name)
         else: (BACKUP/(name+".absent")).touch()
@@ -130,6 +134,28 @@ try:
         print("LIVE_PUBLIC_MCP_PATCH=APPLIED")
     else:
         print("LIVE_PUBLIC_MCP_PATCH=ALREADY_PRESENT")
+
+    # Ensure ChatGPT receives the standard top-level OAuth securitySchemes field
+    # as well as the _meta compatibility mirror.
+    facade=facade_server.read_text()
+    oauth_old='''    const meta=publicMode?publicToolMeta(spec.name):undefined;
+    if (meta) descriptor._meta=meta;'''
+    oauth_new='''    const meta=publicMode?publicToolMeta(spec.name):undefined;
+    if (meta) {
+      descriptor.securitySchemes=meta.securitySchemes;
+      descriptor._meta=meta;
+    }'''
+    if oauth_new not in facade:
+        if oauth_old not in facade:
+            raise RuntimeError("unexpected MCP facade OAuth descriptor source; refusing patch")
+        facade=facade.replace(oauth_old,oauth_new,1)
+        tmp_facade=BACKUP/"server.candidate.mjs"
+        tmp_facade.write_text(facade)
+        run(["node","--check",str(tmp_facade)])
+        shutil.copy2(tmp_facade,facade_server)
+        print("LIVE_OAUTH_DESCRIPTOR_PATCH=APPLIED")
+    else:
+        print("LIVE_OAUTH_DESCRIPTOR_PATCH=ALREADY_PRESENT")
 
     AUTH_ROOT.mkdir(mode=0o700,parents=True,exist_ok=True)
     CFG.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -209,10 +235,14 @@ identity_providers:
       - key: |
 {key_yaml}
     scopes:
-      pse.read: {{}}
-      pse.write: {{}}
-      pse.execute: {{}}
-      pse.admin: {{}}
+      pse.read:
+        claims: []
+      pse.write:
+        claims: []
+      pse.execute:
+        claims: []
+      pse.admin:
+        claims: []
     clients:
       - client_id: 'pse-remote-commander-chatgpt'
         client_name: 'PSE Remote Commander - ChatGPT'
@@ -264,6 +294,20 @@ identity_providers:
             p=Path(root)/fn
             os.chown(p,8000,8000)
             os.chmod(p,0o600)
+
+    # Validate the exact generated Authelia configuration before changing
+    # Caddy or starting a persistent container.
+    validate=run([
+      "docker","run","--rm","--user","8000:8000",
+      "-v",f"{CFG}:/config:ro",
+      "-e","AUTHELIA_SESSION_SECRET_FILE=/config/secrets/session_secret",
+      "-e","AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE=/config/secrets/storage_encryption_key",
+      "-e","AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET_FILE=/config/secrets/oidc_hmac_secret",
+      IMAGE,"authelia","config","validate","--config","/config/configuration.yml"
+    ],False,True,120)
+    if validate.returncode != 0:
+        raise RuntimeError("Authelia config validation failed: "+(validate.stderr or validate.stdout)[:1000])
+    print("AUTHELIA_CONFIG_VALIDATE=PASS")
 
     auth_caddy=f"""{AUTH_HOST} {{
   encode zstd gzip
