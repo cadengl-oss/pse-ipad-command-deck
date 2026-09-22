@@ -23,7 +23,10 @@ docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges:true
   '
 echo "HOST_SECRET_ACCESS=PASS"
 
-docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true   -v "$APP_ROOT:$APP_ROOT:ro"   "$IMAGE" node --input-type=module -e '
+docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+  -e PSE_RC_APP_ROOT="$APP_ROOT" \
+  -v "$APP_ROOT:$APP_ROOT:ro" \
+  "$IMAGE" node --input-type=module -e '
     import { createRequire } from "node:module";
     const root=process.env.PSE_RC_APP_ROOT;
     const requireFromApp=createRequire(root+"/package.json");
@@ -31,7 +34,7 @@ docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-
     const mod=await import(resolved);
     if (typeof mod.Client!=="function") throw new Error("MCP Client export missing");
     if (typeof mod.StreamableHTTPClientTransport!=="function") throw new Error("StreamableHTTPClientTransport export missing");
-  '   --env PSE_RC_APP_ROOT="$APP_ROOT"
+  '
 echo "MCP_CLIENT_API=PASS"
 
 docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges:true   "$IMAGE" node -e "
