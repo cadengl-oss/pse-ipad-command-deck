@@ -98,6 +98,20 @@ test("public edge exposes discovery/challenge and rejects unauthenticated MCP", 
     assert.equal(challenge.status,200);
     assert.equal(await challenge.text(),config.challenge);
 
+    const website=await fetch(`${base}/`);
+    assert.equal(website.status,200);
+    assert.match(await website.text(),/PSE Remote Commander/);
+
+    const docs=await fetch(`${base}/docs`);
+    assert.equal(docs.status,200);
+    assert.match(await docs.text(),/Documentation/);
+
+    const privacy=await fetch(`${base}/privacy`);
+    assert.equal(privacy.status,200);
+
+    const terms=await fetch(`${base}/terms`);
+    assert.equal(terms.status,200);
+
     const mcp=await fetch(`${base}/mcp`,{method:"POST"});
     assert.equal(mcp.status,401);
     assert.match(mcp.headers.get("www-authenticate"),/oauth-protected-resource/);
