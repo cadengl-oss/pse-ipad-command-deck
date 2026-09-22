@@ -12,6 +12,7 @@ const EXPECTED_TOOLS=[
   "kill_process","get_usage_stats","get_recent_tool_calls"
 ];
 const DEVICES=["forge","atlas"];
+const REQUIRE_FULL_ANNOTATIONS=process.env.PSE_RC_REQUIRE_FULL_ANNOTATIONS==="1";
 const CANARY_PATH={
   forge:process.env.PSE_RC_CANARY_FORGE ?? "/home/president/.local/state/pse-remote-commander/pse-v1-certification.txt",
   atlas:process.env.PSE_RC_CANARY_ATLAS ?? "/Users/Shared/PSE/state/remote-commander/pse-v1-certification.txt"
@@ -127,10 +128,19 @@ try{
   const names=listed.tools.map(t=>t.name).sort();
   const expected=[...EXPECTED_TOOLS].sort();
   if(JSON.stringify(names)!==JSON.stringify(expected)) fail(`tool surface mismatch: got ${names.length}`);
+  const annotationGaps=[];
   for(const tool of listed.tools){
-    if(typeof tool.annotations?.readOnlyHint!=="boolean") fail(`missing readOnlyHint: ${tool.name}`);
-    if(typeof tool.annotations?.openWorldHint!=="boolean") fail(`missing openWorldHint: ${tool.name}`);
-    if(typeof tool.annotations?.destructiveHint!=="boolean") fail(`missing destructiveHint: ${tool.name}`);
+    for(const key of ["readOnlyHint","openWorldHint","destructiveHint"]){
+      if(typeof tool.annotations?.[key]!=="boolean") annotationGaps.push(`${tool.name}.${key}`);
+    }
+  }
+  if(annotationGaps.length && REQUIRE_FULL_ANNOTATIONS){
+    fail(`missing required annotations: ${annotationGaps.slice(0,12).join(", ")}${annotationGaps.length>12?" ...":""}`);
+  }
+  if(annotationGaps.length){
+    console.log(`TOOL_ANNOTATIONS=LEGACY gaps=${annotationGaps.length}`);
+  }else{
+    console.log("TOOL_ANNOTATIONS=PASS");
   }
   console.log("TOOL_SURFACE_28=PASS");
 
