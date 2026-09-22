@@ -105,9 +105,9 @@ function bearer(req) {
   return typeof value==="string"&&value.startsWith("Bearer ")?value.slice(7).trim():null;
 }
 
-function audienceMatches(aud,resource) {
-  if (typeof aud==="string") return aud===resource;
-  return Array.isArray(aud)&&aud.includes(resource);
+function resourceMatches(value,resource) {
+  if (typeof value==="string") return value===resource;
+  return Array.isArray(value)&&value.includes(resource);
 }
 
 export async function verifyAccessToken(token,config,{fetchImpl=fetch}={}) {
@@ -129,7 +129,9 @@ export async function verifyAccessToken(token,config,{fetchImpl=fetch}={}) {
   if (data.active!==true) throw new Error("inactive access token");
   if (typeof data.sub!=="string"||!data.sub.trim()) throw new Error("access token subject missing");
   if (data.iss!==undefined && data.iss!==config.oauthIssuer) throw new Error("access token issuer mismatch");
-  if (!audienceMatches(data.aud,config.expectedAudience)) throw new Error("access token audience mismatch");
+  if (!resourceMatches(data.aud,config.expectedAudience) && !resourceMatches(data.resource,config.expectedAudience)) {
+    throw new Error("access token resource mismatch");
+  }
 
   const exact=config.ownerMap.get(data.sub);
   const wildcard=config.ownerMap.get("*");
