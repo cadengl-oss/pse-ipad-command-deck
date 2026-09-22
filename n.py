@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json, os, re, secrets, shutil, stat, subprocess, sys, time
+import hashlib, json, os, re, secrets, shutil, stat, subprocess, sys, time, urllib.request
 from pathlib import Path
 
 AUTH_HOST="auth-rc.74.208.216.118.sslip.io"
@@ -21,6 +21,15 @@ INT_SECRET=Path("/etc/pse/remote-commander-oauth-introspection-secret")
 CREDS=Path("/root/.pse-remote-commander-auth-credentials")
 STAMP=time.strftime("%Y%m%dT%H%M%SZ",time.gmtime())
 BACKUP=Path("/root")/f"pse-rc-no-dns-backup-{STAMP}"
+
+STAGE_COMMIT="1078ea4ec38cdf8e9c1b795639ea7e5bb6f87b9e"
+STAGED_FILES={
+  "rc_public_main.mjs":("332a57b6abcaf282e8a6f47531d521acfcb72232",RC/"apps/mcp-public/main.mjs"),
+  "rc_public_plugin.mjs":("32f9eacbbd85ff417d034ba0027beabb1ca07c9d",RC/"packages/mcp-facade/src/public-plugin.mjs"),
+  "rc_public_edge_test.mjs":("046884df030957fa87d99f5f497e7f3c87f710e4",RC/"packages/mcp-facade/test/public-edge.test.mjs"),
+  "rc_mcp_facade_test.mjs":("19beebec2f9c3085f97536140d34ee8dae16efc6",RC/"packages/mcp-facade/test/mcp-facade.test.mjs"),
+  "rc_server.mjs":("53859f40e0cc9a30ac64850e86ec28aba5d34ec1",RC/"packages/mcp-facade/src/server.mjs"),
+}
 
 def run(args, check=True, capture=True, timeout=60):
     p=subprocess.run(args, text=True, capture_output=capture, timeout=timeout)
@@ -52,6 +61,22 @@ def docker_hash(kind,password):
     if not m: raise RuntimeError(f"unable to parse {kind} digest")
     return m.group(1)
 
+def git_blob_sha(data):
+    header=f"blob {len(data)}\0".encode()
+    return hashlib.sha1(header+data).hexdigest()
+
+def fetch_staged(name, expected_sha, destination):
+    url=f"https://raw.githubusercontent.com/cadengl-oss/pse-ipad-command-deck/{STAGE_COMMIT}/{name}"
+    with urllib.request.urlopen(url,timeout=20) as response:
+        data=response.read()
+    actual=git_blob_sha(data)
+    if actual != expected_sha:
+        raise RuntimeError(f"staged source hash mismatch for {name}: {actual}")
+    destination.parent.mkdir(parents=True,exist_ok=True)
+    destination.write_bytes(data)
+    os.chmod(destination,0o644)
+    print(f"STAGED_{name}=PASS")
+
 def rollback():
     print("ROLLBACK=START")
     run(["systemctl","stop","pse-remote-commander-mcp-public.service"],False)
@@ -65,6 +90,9 @@ def rollback():
         (BACKUP/"remote-commander-owner-map.json",OWNER_MAP),
         (BACKUP/"remote-commander-oauth-introspection-secret",INT_SECRET),
         (BACKUP/"main.mjs",RC/"apps/mcp-public/main.mjs"),
+        (BACKUP/"public-plugin.mjs",RC/"packages/mcp-facade/src/public-plugin.mjs"),
+        (BACKUP/"public-edge.test.mjs",RC/"packages/mcp-facade/test/public-edge.test.mjs"),
+        (BACKUP/"mcp-facade.test.mjs",RC/"packages/mcp-facade/test/mcp-facade.test.mjs"),
         (BACKUP/"server.mjs",RC/"packages/mcp-facade/src/server.mjs"),
     ]:
         if src.exists():
@@ -89,7 +117,9 @@ try:
     if run(["docker","inspect","pse-remote-commander-auth"],False).returncode==0:
         raise RuntimeError("pse-remote-commander-auth container already exists")
     main=RC/"apps/mcp-public/main.mjs"
-    if not main.exists(): raise RuntimeError("RC19 public MCP implementation missing")
+    public_plugin=RC/"packages/mcp-facade/src/public-plugin.mjs"
+    public_edge_test=RC/"packages/mcp-facade/test/public-edge.test.mjs"
+    facade_test=RC/"packages/mcp-facade/test/mcp-facade.test.mjs"
     if not (RC/"apps/relay/main.mjs").exists(): raise RuntimeError("Remote Commander release tree incomplete")
     facade_server=RC/"packages/mcp-facade/src/server.mjs"
     if not facade_server.exists(): raise RuntimeError("Remote Commander MCP facade source missing")
@@ -102,10 +132,20 @@ try:
         (MCP_CADDY,"pse-remote-commander.caddy"),(UNIT,"pse-remote-commander-mcp-public.service"),
         (ENV,"remote-commander-mcp-public.env"),(OWNER_MAP,"remote-commander-owner-map.json"),
         (INT_SECRET,"remote-commander-oauth-introspection-secret"),(main,"main.mjs"),
+        (public_plugin,"public-plugin.mjs"),(public_edge_test,"public-edge.test.mjs"),
+        (facade_test,"mcp-facade.test.mjs"),
         (RC/"packages/mcp-facade/src/server.mjs","server.mjs")
     ]:
         if src.exists(): shutil.copy2(src,BACKUP/name)
         else: (BACKUP/(name+".absent")).touch()
+
+    # The live RC19 core predates PR #11. Stage the exact audited public-edge
+    # files from a pinned public commit, verifying Git blob identity first.
+    for staged_name,(expected_sha,destination) in STAGED_FILES.items():
+        fetch_staged(staged_name,expected_sha,destination)
+    run(["node","--check",str(main)])
+    run(["node","--check",str(public_plugin)])
+    print("PUBLIC_EDGE_SOURCE_STAGE=PASS")
 
     # Patch only the RC19 owner-routing block, fail closed on unexpected source.
     src=main.read_text()
