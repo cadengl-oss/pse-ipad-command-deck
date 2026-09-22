@@ -167,7 +167,9 @@ function writeText(res,status,value,contentType="text/plain; charset=utf-8") {
 }
 
 const PUBLIC_PAGES=Object.freeze({
+  "/": "<!doctype html><meta charset=utf-8><title>PSE Remote Commander</title><h1>PSE Remote Commander</h1><p>Authenticated remote computer control for PSE-linked devices through ChatGPT.</p><p><a href='/docs'>Documentation</a> · <a href='/support'>Support</a> · <a href='/privacy'>Privacy</a> · <a href='/terms'>Terms</a></p>",
   "/about": "<!doctype html><meta charset=utf-8><title>PSE Remote Commander</title><h1>PSE Remote Commander</h1><p>Authenticated remote computer control for PSE-linked devices through ChatGPT.</p>",
+  "/docs": "<!doctype html><meta charset=utf-8><title>PSE Remote Commander Documentation</title><h1>Documentation</h1><p>Authenticate through ChatGPT, then use the MCP tools available to your owner-scoped PSE account. Device routing is enforced by the authenticated owner mapping.</p>",
   "/support": "<!doctype html><meta charset=utf-8><title>PSE Remote Commander Support</title><h1>Support</h1><p>Support for PSE Remote Commander is provided by Pilot Sales Enterprise. Contact the publisher through the account that provisioned this plugin.</p>",
   "/privacy": "<!doctype html><meta charset=utf-8><title>PSE Remote Commander Privacy</title><h1>Privacy</h1><p>PSE Remote Commander processes authenticated tool requests only to operate devices explicitly linked to the authenticated PSE owner. Authentication secrets are not included in tool responses. Operational call records may be retained for security, auditing, and troubleshooting.</p>",
   "/terms": "<!doctype html><meta charset=utf-8><title>PSE Remote Commander Terms</title><h1>Terms</h1><p>Use is limited to computers and accounts you are authorized to control. Users are responsible for commands they request and for maintaining account credentials. Access may be suspended when misuse or unauthorized access is detected.</p>"
