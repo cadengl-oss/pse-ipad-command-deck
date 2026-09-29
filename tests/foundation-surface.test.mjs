@@ -184,3 +184,13 @@ test("service worker caches the Foundation contract", () => {
   assert.match(sw, /pse-command-deck-v7/);
   assert.match(sw, /\.\/foundation-surface\.js/);
 });
+
+test("accepts the externally supplied canonical producer fixture when provided", () => {
+  const fixturePath = process.env.PSE_FOUNDATION_SURFACE_FIXTURE;
+  if (!fixturePath) return;
+  const data = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
+  const summary = contract.summarize(contract.validate(data));
+  assert.equal(summary.runtimeTruthStatus, "UNKNOWN_NO_ACCEPTANCE");
+  assert.deepEqual(summary.managedHostIDs, ["PSE-HOST-ATLAS", "PSE-HOST-FORGE", "PSE-HOST-NEXUS"]);
+  assert.equal(summary.hostHealthAvailable, false);
+});
