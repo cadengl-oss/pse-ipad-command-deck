@@ -60,6 +60,24 @@ function fixture() {
   };
 }
 
+function acceptedFixture() {
+  const data = fixture();
+  data.schemaVersion = 2;
+  data.runtime = {
+    truthStatus: "NOT_LIVE_COMPLETE",
+    acceptanceAvailable: true,
+    liveComplete: false,
+    evidenceEvaluatedAt: "2026-09-29T12:30:00+00:00",
+    evidenceFreshUntil: "2026-09-30T12:26:54+00:00",
+    evidenceMaxAgeHours: 24
+  };
+  data.attention.runtimeAcceptanceMissing = false;
+  data.attention.runtimeNotLiveComplete = true;
+  data.capabilities.runtimeEvidenceAvailable = true;
+  data.capabilities.hostHealthAvailable = true;
+  return data;
+}
+
 test("validates canonical Foundation Surface and preserves unknown runtime", () => {
   const data = contract.validate(fixture());
   const summary = contract.summarize(data);
@@ -71,6 +89,22 @@ test("validates canonical Foundation Surface and preserves unknown runtime", () 
   assert.equal(summary.requirementsNotSatisfied, 30);
   assert.equal(summary.completeProfiles, 5);
   assert.equal(summary.notEvaluatedProfiles, 1);
+});
+
+test("accepts fresh v2 runtime evidence and rejects it after expiry", () => {
+  const data = acceptedFixture();
+  const fresh = contract.summarize(data, Date.parse("2026-09-29T13:00:00Z"));
+  assert.equal(fresh.runtimeTruthStatus, "NOT_LIVE_COMPLETE");
+  assert.equal(fresh.runtimeEvidenceAvailable, true);
+  assert.equal(fresh.hostHealthAvailable, true);
+  assert.throws(
+    () => contract.validate(data, Date.parse("2026-10-01T00:00:00Z")),
+    /expired/
+  );
+
+  const legacyAccepted = acceptedFixture();
+  legacyAccepted.schemaVersion = 1;
+  assert.throws(() => contract.validate(legacyAccepted), /schema v1/);
 });
 
 test("rejects legacy managed host names", () => {

@@ -80,7 +80,7 @@
     return /^[0-9a-f]{64}$/.test(String(value || ""));
   }
 
-  function validate(payload) {
+  function validate(payload, nowMs = Date.now()) {
     if (!isObject(payload)) fail("Foundation Surface must be an object");
     walk(payload);
 
@@ -92,7 +92,7 @@
     exactObject(payload, rootKeys, "$");
     requireKeys(payload, rootKeys, "$");
 
-    if (payload.schemaVersion !== 1) fail("unsupported Foundation Surface schema");
+    if (payload.schemaVersion !== 1 && payload.schemaVersion !== 2) fail("unsupported Foundation Surface schema");
     if (payload.kind !== "PSE_FOUNDATION_SURFACE") fail("invalid Foundation Surface kind");
     if (!isSHA256ID(payload.surfaceId)) fail("invalid Foundation Surface ID");
     if (payload.authority !== AUTHORITY) fail("invalid Foundation Surface authority");
@@ -121,8 +121,14 @@
       if (actual.id !== expected.id || actual.name !== expected.name) fail("managed host identity drift");
     }
 
-    const runtime = exactObject(payload.runtime, ["truthStatus", "acceptanceAvailable", "liveComplete"], "$.runtime");
+    const runtime = exactObject(payload.runtime, [
+      "truthStatus", "acceptanceAvailable", "liveComplete",
+      "evidenceEvaluatedAt", "evidenceFreshUntil", "evidenceMaxAgeHours"
+    ], "$.runtime");
     requireKeys(runtime, ["truthStatus", "acceptanceAvailable", "liveComplete"], "$.runtime");
+    if (payload.schemaVersion === 2) {
+      requireKeys(runtime, ["evidenceEvaluatedAt", "evidenceFreshUntil", "evidenceMaxAgeHours"], "$.runtime");
+    }
     stringValue(runtime.truthStatus, "$.runtime.truthStatus");
     booleanValue(runtime.acceptanceAvailable, "$.runtime.acceptanceAvailable");
     nullableBoolean(runtime.liveComplete, "$.runtime.liveComplete");
@@ -190,6 +196,10 @@
     booleanValue(capabilities.hostHealthAvailable, "$.capabilities.hostHealthAvailable");
     if (capabilities.commandsAvailable !== false) fail("command capability must remain false");
 
+    if (payload.schemaVersion === 1 && runtime.acceptanceAvailable === true) {
+      fail("schema v1 cannot carry runtime acceptance");
+    }
+
     if (runtime.acceptanceAvailable === false) {
       if (runtime.truthStatus !== "UNKNOWN_NO_ACCEPTANCE" ||
           runtime.liveComplete !== null ||
@@ -197,13 +207,30 @@
           capabilities.hostHealthAvailable !== false) {
         fail("runtime truth inferred without acceptance");
       }
+      if (payload.schemaVersion === 2 &&
+          (runtime.evidenceEvaluatedAt !== null ||
+           runtime.evidenceFreshUntil !== null ||
+           runtime.evidenceMaxAgeHours !== null)) {
+        fail("missing acceptance cannot expose freshness metadata");
+      }
+    } else {
+      if (payload.schemaVersion !== 2) fail("accepted runtime evidence requires schema v2");
+      stringValue(runtime.evidenceEvaluatedAt, "$.runtime.evidenceEvaluatedAt");
+      stringValue(runtime.evidenceFreshUntil, "$.runtime.evidenceFreshUntil");
+      if (typeof runtime.evidenceMaxAgeHours !== "number" || runtime.evidenceMaxAgeHours <= 0) {
+        fail("$.runtime.evidenceMaxAgeHours must be positive");
+      }
+      const evaluated = Date.parse(runtime.evidenceEvaluatedAt);
+      const freshUntil = Date.parse(runtime.evidenceFreshUntil);
+      if (!Number.isFinite(evaluated) || !Number.isFinite(freshUntil)) fail("invalid runtime evidence timestamp");
+      if (nowMs > freshUntil) fail("runtime acceptance evidence expired");
     }
 
     return payload;
   }
 
-  function summarize(payload) {
-    const data = validate(payload);
+  function summarize(payload, nowMs = Date.now()) {
+    const data = validate(payload, nowMs);
     return Object.freeze({
       surfaceId: data.surfaceId,
       runtimeTruthStatus: data.runtime.truthStatus,
