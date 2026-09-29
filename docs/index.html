@@ -35,11 +35,24 @@
     </section>
     <section class="section" id="systems">
       <div class="section-head"><div><small>QUICK ACTIONS</small><h2>System shortcuts</h2></div></div>
+      <div class="composer-card" aria-live="polite">
+        <div class="section-head library-head">
+          <div><small>FOUNDATION READ MODEL</small><h2>PSE truth surface</h2></div>
+          <div class="library-state"><b id="foundationState">Not loaded</b><button id="foundationRefresh" type="button">Refresh</button></div>
+        </div>
+        <div class="grid">
+          <div class="mission"><b>Runtime truth</b><span id="foundationRuntime">UNKNOWN</span></div>
+          <div class="mission"><b>Graph</b><span id="foundationGraph">Unavailable</span></div>
+          <div class="mission"><b>Repositories</b><span id="foundationRepos">Unavailable</span></div>
+          <div class="mission"><b>Completeness</b><span id="foundationCompleteness">Unavailable</span></div>
+        </div>
+        <p class="hint" id="foundationMeta">Private Foundation Surface has not been loaded.</p>
+      </div>
       <div class="grid">
         <a class="mission app-link" href="https://desktop.74.208.216.118.sslip.io/forge/vnc.html?autoconnect=1&resize=scale" target="_blank" rel="noopener"><b>Forge Remote</b><span>Live noVNC desktop</span></a>
-        <button class="mission" data-preset="mac"><b>Mac</b><span>Status shortcut</span></button>
-        <button class="mission" data-preset="omarchy"><b>Omarchy</b><span>Status shortcut</span></button>
-        <button class="mission" data-preset="vps"><b>VPS</b><span>Status shortcut</span></button>
+        <button class="mission" data-preset="atlas"><b>Atlas</b><span>Status shortcut</span></button>
+        <button class="mission" data-preset="forge"><b>Forge</b><span>Status shortcut</span></button>
+        <button class="mission" data-preset="nexus"><b>Nexus</b><span>Status shortcut</span></button>
         <button class="mission" data-preset="sns"><b>SNS Go</b><span>Workflow shortcut</span></button>
       </div>
     </section>
@@ -67,6 +80,7 @@
     <footer><span>PSE Command Deck</span><span id="clock">—</span></footer>
   </main>
   <div class="toast" id="toast" hidden></div>
+  <script src="./foundation-surface.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

@@ -4,6 +4,8 @@
   const input = $("missionInput");
   const toast = $("toast");
   const SURFACE_API = "https://omarchy.tail7ba003.ts.net:10443/api/surface";
+  const FOUNDATION_API = "https://omarchy.tail7ba003.ts.net:10443/api/foundation";
+  const foundationContract = window.PSEFoundationSurface;
   const LIBRARY_FALLBACK = "https://omarchy.tail7ba003.ts.net:10443/";
   const PRIVATE_DECK = "https://omarchy.tail7ba003.ts.net:9443/deck/";
   let deferredInstall = null;
@@ -11,9 +13,9 @@
   let libraryPayload = null;
 
   const presets = {
-    mac: "Give me the current evidence-backed status of my PSE MacBook environment and the best next action.",
-    omarchy: "Give me the current evidence-backed status of my PSE Omarchy machine and the best next action.",
-    vps: "Give me the current evidence-backed status of my PSE VPS services and storage, then the best next action.",
+    atlas: "Give me the current evidence-backed status of Atlas in the PSE Grid and the best next action.",
+    forge: "Give me the current evidence-backed status of Forge in the PSE Grid and the best next action.",
+    nexus: "Give me the current evidence-backed status of Nexus in the PSE Grid and the best next action.",
     sns: "S and S Go: summarize current state and scope, then continue with the highest-value safe next step and verify it.",
     sales: "Open the current Website Sales OS context, summarize its latest status, and continue the highest-priority unfinished item safely.",
     control: "Open PSE Mission Control context and give me the most useful current control summary from connected PSE tools.",
@@ -63,6 +65,61 @@
       return null;
     }
   }
+
+
+  function setFoundationUnavailable(state, detail) {
+    $("foundationState").textContent = state;
+    $("foundationState").dataset.state = "offline";
+    $("foundationRuntime").textContent = "UNKNOWN";
+    $("foundationGraph").textContent = "Unavailable";
+    $("foundationRepos").textContent = "Unavailable";
+    $("foundationCompleteness").textContent = "Unavailable";
+    $("foundationMeta").textContent = detail;
+  }
+
+  function renderFoundation(data) {
+    const summary = foundationContract.summarize(data);
+    $("foundationState").textContent = "Verified surface";
+    $("foundationState").dataset.state = "live";
+    $("foundationRuntime").textContent = summary.runtimeTruthStatus;
+    $("foundationGraph").textContent = summary.graphUnresolved + " unresolved";
+    $("foundationRepos").textContent = summary.repositoryCandidates + " candidates";
+    $("foundationCompleteness").textContent =
+      summary.completeProfiles + " complete · " + summary.notEvaluatedProfiles + " not evaluated";
+    $("foundationMeta").textContent =
+      summary.managedHostIDs.join(" · ") + " · commands unavailable";
+  }
+
+  async function loadFoundation() {
+    if (!foundationContract) {
+      setFoundationUnavailable("Contract unavailable", "Foundation Surface validator did not load.");
+      return;
+    }
+    if (foundationContract.isPublicBootstrap(location.hostname)) {
+      setFoundationUnavailable(
+        "Private Deck required",
+        "Public GitHub Pages does not request private Foundation truth. Open the Private Deck on the PSE tailnet."
+      );
+      return;
+    }
+    $("foundationState").textContent = "Connecting…";
+    $("foundationState").dataset.state = "loading";
+    try {
+      const response = await fetch(FOUNDATION_API, {
+        cache: "no-store",
+        mode: "cors",
+        headers: { Accept: "application/json" }
+      });
+      if (!response.ok) throw new Error("foundation " + response.status);
+      renderFoundation(foundationContract.validate(await response.json()));
+    } catch {
+      setFoundationUnavailable(
+        "Foundation unavailable",
+        "The private Foundation Surface could not be verified. Runtime and host health remain unknown."
+      );
+    }
+  }
+
 
   function libraryCard(item) {
     const link = document.createElement("a");
@@ -181,7 +238,8 @@
   $("openButton").addEventListener("click", () => openChatGPT().catch(() => notify("Open failed. Mission is still in the composer.")));
   $("librarySearch").addEventListener("input", renderLibrary);
   $("libraryRefresh").addEventListener("click", () => loadLibrary());
-  window.addEventListener("online", () => { updateNetwork(); loadLibrary(); });
+  $("foundationRefresh").addEventListener("click", () => loadFoundation());
+  window.addEventListener("online", () => { updateNetwork(); loadLibrary(); loadFoundation(); });
   window.addEventListener("offline", updateNetwork);
   window.addEventListener("beforeinstallprompt", (event) => { event.preventDefault(); deferredInstall = event; });
 
@@ -193,6 +251,7 @@
   if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("./sw.js").catch(() => {});
   updateNetwork();
   loadLibrary();
+  loadFoundation();
   const updateClock = () => { $("clock").textContent = new Date().toLocaleString([], { weekday:"short", hour:"2-digit", minute:"2-digit" }); };
   updateClock(); setInterval(updateClock, 30000);
 })();
