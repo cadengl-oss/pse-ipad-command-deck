@@ -38,7 +38,25 @@ function fixture() {
     repositories: { discovered: 21, match: 12, newCandidate: 9, missing: 0, conflict: 0, unknown: 0 },
     completeness: {
       summary: { profiles: 6, completeProfiles: 5, incompleteProfiles: 0, notEvaluatedProfiles: 1 },
-      profiles: []
+      profiles: [
+        {
+          id: "CANONICAL_HOST",
+          status: "COMPLETE",
+          evaluated: 3,
+          complete: 3,
+          incomplete: 0,
+          missingCount: 0
+        },
+        {
+          id: "PRODUCTION_SERVICE",
+          status: "NOT_EVALUATED",
+          evaluated: 0,
+          complete: 0,
+          incomplete: 0,
+          missingCount: 0,
+          reason: "authority input unavailable"
+        }
+      ]
     },
     attention: {
       repositoryCandidates: 9,
@@ -57,6 +75,10 @@ function fixture() {
   };
 }
 
+function clone(value) {
+  return structuredClone(value);
+}
+
 test("validates canonical Foundation Surface and preserves unknown runtime", () => {
   const data = contract.validate(fixture());
   const summary = contract.summarize(data);
@@ -69,10 +91,34 @@ test("validates canonical Foundation Surface and preserves unknown runtime", () 
   assert.equal(summary.notEvaluatedProfiles, 1);
 });
 
-test("rejects legacy managed host names", () => {
+test("rejects unknown top-level and nested keys", () => {
+  const top = fixture();
+  top.extra = true;
+  assert.throws(() => contract.validate(top), /keys do not match/);
+
+  const nested = fixture();
+  nested.runtime.extra = "nope";
+  assert.throws(() => contract.validate(nested), /runtime keys/);
+});
+
+test("rejects authority drift and malformed source provenance", () => {
+  const authority = fixture();
+  authority.authority = "consumer recomputed truth";
+  assert.throws(() => contract.validate(authority), /authority/);
+
+  const source = fixture();
+  source.sources.compilerSha256 = "ABC";
+  assert.throws(() => contract.validate(source), /compilerSha256/);
+});
+
+test("rejects legacy managed host names and leaked legacy identities", () => {
   const data = fixture();
   data.managedHosts[0] = { id: "PSE-HOST-ATLAS", name: "Mac" };
   assert.throws(() => contract.validate(data), /managed host identity drift/);
+
+  const leaked = fixture();
+  leaked.completeness.profiles[1].reason = "VPS";
+  assert.throws(() => contract.validate(leaked), /legacy host identity/);
 });
 
 test("rejects command capability and ranking fields", () => {
@@ -82,7 +128,42 @@ test("rejects command capability and ranking fields", () => {
 
   const scoreData = fixture();
   scoreData.score = 100;
-  assert.throws(() => contract.validate(scoreData), /forbidden Foundation Surface key/);
+  assert.throws(() => contract.validate(scoreData), /keys do not match|forbidden Foundation Surface key/);
+});
+
+test("rejects invalid numeric fields and completeness status", () => {
+  const negative = fixture();
+  negative.graph.unresolved = -1;
+  assert.throws(() => contract.validate(negative), /non-negative integer/);
+
+  const fractional = fixture();
+  fractional.repositories.newCandidate = 1.5;
+  assert.throws(() => contract.validate(fractional), /non-negative integer/);
+
+  const status = fixture();
+  status.completeness.profiles[0].status = "PERFECT";
+  assert.throws(() => contract.validate(status), /profile status/);
+});
+
+test("rejects inferred runtime truth when acceptance is absent", () => {
+  const data = fixture();
+  data.runtime.truthStatus = "LIVE_COMPLETE";
+  data.runtime.liveComplete = true;
+  data.capabilities.runtimeEvidenceAvailable = true;
+  data.capabilities.hostHealthAvailable = true;
+  assert.throws(() => contract.validate(data), /runtime truth inferred/);
+});
+
+test("accepts typed runtime evidence when acceptance is explicitly available", () => {
+  const data = fixture();
+  data.runtime = {
+    truthStatus: "LIVE_COMPLETE",
+    acceptanceAvailable: true,
+    liveComplete: true
+  };
+  data.capabilities.runtimeEvidenceAvailable = true;
+  data.capabilities.hostHealthAvailable = true;
+  assert.doesNotThrow(() => contract.validate(data));
 });
 
 test("public GitHub Pages bootstrap is privacy-gated", () => {
