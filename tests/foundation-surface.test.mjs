@@ -190,7 +190,11 @@ test("accepts the externally supplied canonical producer fixture when provided",
   if (!fixturePath) return;
   const data = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
   const summary = contract.summarize(contract.validate(data));
-  assert.equal(summary.runtimeTruthStatus, "UNKNOWN_NO_ACCEPTANCE");
+  assert.equal(summary.surfaceId, data.surfaceId);
+  assert.equal(summary.runtimeTruthStatus, data.runtime.truthStatus);
   assert.deepEqual(summary.managedHostIDs, ["PSE-HOST-ATLAS", "PSE-HOST-FORGE", "PSE-HOST-NEXUS"]);
-  assert.equal(summary.hostHealthAvailable, false);
+  assert.equal(summary.runtimeEvidenceAvailable, data.capabilities.runtimeEvidenceAvailable);
+  assert.equal(summary.hostHealthAvailable, data.capabilities.hostHealthAvailable);
+  assert.equal(data.capabilities.commandsAvailable, false);
+  assert.equal(data.mutationPerformed, false);
 });
