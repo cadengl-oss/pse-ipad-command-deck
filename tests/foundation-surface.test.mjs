@@ -18,9 +18,9 @@ function fixture() {
     sources: {
       truthReportId: "sha256:" + hash("2"),
       graphSnapshotId: "sha256:" + hash("3"),
-      truthReportSha256: hash("2"),
-      completenessSha256: hash("4"),
-      compilerSha256: hash("5")
+      truthReportSha256: hash("4"),
+      completenessSha256: hash("5"),
+      compilerSha256: hash("6")
     },
     authority: "PSE Bible Foundation derived read model",
     managedHosts: [
@@ -38,7 +38,10 @@ function fixture() {
     repositories: { discovered: 21, match: 12, newCandidate: 9, missing: 0, conflict: 0, unknown: 0 },
     completeness: {
       summary: { profiles: 6, completeProfiles: 5, incompleteProfiles: 0, notEvaluatedProfiles: 1 },
-      profiles: []
+      profiles: [
+        { id: "CANONICAL_HOST", status: "COMPLETE", evaluated: 3, complete: 3, incomplete: 0, missingCount: 0 },
+        { id: "PRODUCTION_SERVICE", status: "NOT_EVALUATED", evaluated: 0, complete: 0, incomplete: 0, missingCount: 0, reason: "authority input unavailable" }
+      ]
     },
     attention: {
       repositoryCandidates: 9,
@@ -65,6 +68,7 @@ test("validates canonical Foundation Surface and preserves unknown runtime", () 
   assert.equal(summary.hostHealthAvailable, false);
   assert.equal(summary.graphUnresolved, 145);
   assert.equal(summary.repositoryCandidates, 9);
+  assert.equal(summary.requirementsNotSatisfied, 30);
   assert.equal(summary.completeProfiles, 5);
   assert.equal(summary.notEvaluatedProfiles, 1);
 });
@@ -81,8 +85,58 @@ test("rejects command capability and ranking fields", () => {
   assert.throws(() => contract.validate(commandData), /command capability/);
 
   const scoreData = fixture();
-  scoreData.score = 100;
+  scoreData.requirements.byStatus.score = 100;
   assert.throws(() => contract.validate(scoreData), /forbidden Foundation Surface key/);
+});
+
+test("rejects unknown schema keys instead of silently ignoring them", () => {
+  const topLevel = fixture();
+  topLevel.unexpected = "drift";
+  assert.throws(() => contract.validate(topLevel), /unknown Foundation Surface key/);
+
+  const nested = fixture();
+  nested.graph.extra = 1;
+  assert.throws(() => contract.validate(nested), /unknown Foundation Surface key/);
+});
+
+test("rejects invalid provenance and authority", () => {
+  const authority = fixture();
+  authority.authority = "something else";
+  assert.throws(() => contract.validate(authority), /authority/);
+
+  const hash = fixture();
+  hash.sources.compilerSha256 = "ABC";
+  assert.throws(() => contract.validate(hash), /compilerSha256/);
+
+  const snapshot = fixture();
+  snapshot.sources.graphSnapshotId = "sha256:" + "A".repeat(64);
+  assert.throws(() => contract.validate(snapshot), /graphSnapshotId/);
+});
+
+test("rejects negative counts and invalid profile states", () => {
+  const negative = fixture();
+  negative.graph.unresolved = -1;
+  assert.throws(() => contract.validate(negative), /nonnegative integer/);
+
+  const badProfile = fixture();
+  badProfile.completeness.profiles[0].status = "HEALTHY";
+  assert.throws(() => contract.validate(badProfile), /profile status/);
+});
+
+test("rejects missing required contract fields", () => {
+  const data = fixture();
+  delete data.attention;
+  assert.throws(() => contract.validate(data), /missing Foundation Surface key/);
+});
+
+test("rejects inferred runtime health when acceptance is absent", () => {
+  const bad = fixture();
+  bad.capabilities.hostHealthAvailable = true;
+  assert.throws(() => contract.validate(bad), /runtime truth inferred/);
+
+  const live = fixture();
+  live.runtime.truthStatus = "LIVE_COMPLETE";
+  assert.throws(() => contract.validate(live), /runtime truth inferred/);
 });
 
 test("public GitHub Pages bootstrap is privacy-gated", () => {
@@ -97,6 +151,15 @@ test("Command Deck guards private Foundation fetch before the fetch call", () =>
   const fetchIndex = app.indexOf("fetch(FOUNDATION_API", start);
   assert.ok(start >= 0 && guard > start && fetchIndex > guard);
   assert.match(app, /cache:\s*"no-store"/);
+});
+
+test("Foundation failure rendering does not infer health", () => {
+  const app = fs.readFileSync(path.join(repoRoot, "docs/app.js"), "utf8");
+  const start = app.indexOf("function setFoundationUnavailable");
+  const end = app.indexOf("function renderFoundation", start);
+  const block = app.slice(start, end);
+  assert.match(block, /foundationRuntime"\)\.textContent = "UNKNOWN"/);
+  assert.doesNotMatch(block, /HEALTHY|LIVE_COMPLETE/);
 });
 
 test("active system shortcuts use Atlas Forge Nexus", () => {
